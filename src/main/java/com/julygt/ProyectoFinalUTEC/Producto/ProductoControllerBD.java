@@ -18,7 +18,7 @@ import java.util.Map;
 public class ProductoControllerBD {
 
     private final ProductoServiceBD productoService;
-    private final CategoriaService categoriaService; // <-- inyectamos el servicio de categorías
+    private final CategoriaService categoriaService; // <-- servicio de categorías
 
     public ProductoControllerBD(ProductoServiceBD productoService, CategoriaService categoriaService) {
         this.productoService = productoService;
@@ -28,6 +28,16 @@ public class ProductoControllerBD {
     @GetMapping
     public List<ProductoBD> listar() {
         return productoService.listarTodos();
+    }
+
+    // Buscar productos por nombre parcial
+    @GetMapping("/buscar/{nombre}")
+    public ResponseEntity<List<ProductoBD>> buscarPorNombre(@PathVariable String nombre) {
+        List<ProductoBD> resultados = productoService.buscarPorNombre(nombre);
+        if (resultados.isEmpty()) {
+            return ResponseEntity.noContent().build(); // 204 sin contenido
+        }
+        return ResponseEntity.ok(resultados);
     }
 
     @GetMapping("/{id}")

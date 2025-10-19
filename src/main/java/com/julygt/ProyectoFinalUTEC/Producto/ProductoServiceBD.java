@@ -29,4 +29,8 @@ public class ProductoServiceBD {
     public void eliminar(Long id) {
         productoRepository.deleteById(id);
     }
+
+    // metodo buscarx nombre
+    public List<ProductoBD> buscarPorNombre(String nombre) {
+        return productoRepository.buscarPorNombre(nombre);}
 }
