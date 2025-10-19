@@ -46,10 +46,34 @@ public class ProductoControllerBD {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-/* --Antes
+    /* --Antes
+        @PostMapping
+        public ResponseEntity<?> crear(@RequestBody ProductoBD producto) {
+            // Obtener el usuario autenticado desde Spring Security
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (!(principal instanceof Usuario vendedorActual)) {
+                return ResponseEntity.status(401).body(Map.of(
+                        "error", "No autorizado",
+                        "message", "Usuario no autenticado"
+                ));
+            }
+
+            if (vendedorActual.getRole() != Role.vendedor) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "error", "Prohibido",
+                        "message", "Solo vendedores pueden crear productos"
+                ));
+            }
+
+            producto.setVendedor(vendedorActual);
+            ProductoBD guardado = productoService.guardar(producto);
+            return ResponseEntity.ok(guardado);
+        }
+    */
+// Ahora
     @PostMapping
-    public ResponseEntity<?> crear(@RequestBody ProductoBD producto) {
-        // Obtener el usuario autenticado desde Spring Security
+    public ResponseEntity<?> crear(@RequestBody Map<String, Object> requestBody) {
+        // Usuario autenticado
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!(principal instanceof Usuario vendedorActual)) {
             return ResponseEntity.status(401).body(Map.of(
@@ -65,58 +89,34 @@ public class ProductoControllerBD {
             ));
         }
 
+        // Crear producto
+        ProductoBD producto = new ProductoBD();
+        producto.setNombre((String) requestBody.get("nombre"));
+        producto.setPrecio(Double.valueOf(requestBody.get("precio").toString()));
+        producto.setStock(Integer.valueOf(requestBody.get("stock").toString()));
         producto.setVendedor(vendedorActual);
+
+        // Asignar categoría
+        if (!requestBody.containsKey("id_categoria")) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Categoría requerida",
+                    "message", "Debes indicar id_categoria"
+            ));
+        }
+        Long categoriaId = Long.valueOf(requestBody.get("id_categoria").toString());
+        var categoriaOpt = categoriaService.obtenerPorId(categoriaId);
+        if (categoriaOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Categoría no encontrada",
+                    "message", "No existe categoría con id " + categoriaId
+            ));
+        }
+        producto.setCategoria(categoriaOpt.get());
+
+        // Guardar producto
         ProductoBD guardado = productoService.guardar(producto);
         return ResponseEntity.ok(guardado);
     }
-*/
-// Ahora
-@PostMapping
-public ResponseEntity<?> crear(@RequestBody Map<String, Object> requestBody) {
-    // Usuario autenticado
-    Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    if (!(principal instanceof Usuario vendedorActual)) {
-        return ResponseEntity.status(401).body(Map.of(
-                "error", "No autorizado",
-                "message", "Usuario no autenticado"
-        ));
-    }
-
-    if (vendedorActual.getRole() != Role.vendedor) {
-        return ResponseEntity.status(403).body(Map.of(
-                "error", "Prohibido",
-                "message", "Solo vendedores pueden crear productos"
-        ));
-    }
-
-    // Crear producto
-    ProductoBD producto = new ProductoBD();
-    producto.setNombre((String) requestBody.get("nombre"));
-    producto.setPrecio(Double.valueOf(requestBody.get("precio").toString()));
-    producto.setStock(Integer.valueOf(requestBody.get("stock").toString()));
-    producto.setVendedor(vendedorActual);
-
-    // Asignar categoría
-    if (!requestBody.containsKey("id_categoria")) {
-        return ResponseEntity.badRequest().body(Map.of(
-                "error", "Categoría requerida",
-                "message", "Debes indicar id_categoria"
-        ));
-    }
-    Long categoriaId = Long.valueOf(requestBody.get("id_categoria").toString());
-    var categoriaOpt = categoriaService.obtenerPorId(categoriaId);
-    if (categoriaOpt.isEmpty()) {
-        return ResponseEntity.badRequest().body(Map.of(
-                "error", "Categoría no encontrada",
-                "message", "No existe categoría con id " + categoriaId
-        ));
-    }
-    producto.setCategoria(categoriaOpt.get());
-
-    // Guardar producto
-    ProductoBD guardado = productoService.guardar(producto);
-    return ResponseEntity.ok(guardado);
-}
 
 
 
