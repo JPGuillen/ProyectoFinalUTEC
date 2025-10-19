@@ -1,5 +1,6 @@
 package com.julygt.ProyectoFinalUTEC.config;
 
+import com.julygt.ProyectoFinalUTEC.Producto.ProductoException;
 import com.julygt.ProyectoFinalUTEC.auth.AuthDTO;
 import com.julygt.ProyectoFinalUTEC.auth.AuthException;
 import org.springframework.http.HttpStatus;
@@ -43,4 +44,31 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new AuthDTO.ErrorResponse("INTERNAL_ERROR", "Error interno del servidor", 500));
     }
+
+    // PRODUCTOS
+
+    @ExceptionHandler(ProductoException.NoAutorizadoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handleProductoNoAutorizado(ProductoException.NoAutorizadoException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new AuthDTO.ErrorResponse("PRODUCT_NOT_AUTHORIZED", e.getMessage(), 401));
+    }
+
+    @ExceptionHandler(ProductoException.AccesoProhibidoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handleProductoAccesoProhibido(ProductoException.AccesoProhibidoException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new AuthDTO.ErrorResponse("PRODUCT_ACCESS_FORBIDDEN", e.getMessage(), 403));
+    }
+
+    @ExceptionHandler(ProductoException.NoEncontradoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handleProductoNoEncontrado(ProductoException.NoEncontradoException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new AuthDTO.ErrorResponse("PRODUCT_NOT_FOUND", e.getMessage(), 404));
+    }
+
+    @ExceptionHandler(ProductoException.DatosInvalidosException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handleProductoDatosInvalidos(ProductoException.DatosInvalidosException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new AuthDTO.ErrorResponse("PRODUCT_BAD_REQUEST", e.getMessage(), 400));
+    }
+
 }

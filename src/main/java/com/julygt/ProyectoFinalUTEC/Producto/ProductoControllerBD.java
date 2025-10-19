@@ -1,7 +1,5 @@
 package com.julygt.ProyectoFinalUTEC.Producto;
 
-import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
-import com.julygt.ProyectoFinalUTEC.Producto.ProductoServiceBD;
 import com.julygt.ProyectoFinalUTEC.categorias.CategoriaService;
 import com.julygt.ProyectoFinalUTEC.usuario.Role;
 import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
@@ -13,80 +11,91 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/productosBD") // Esto viene de la BAse de datos (Productos)
+@RequestMapping("/api/productosBD") // Esto viene de la BD(Productos)
 
 public class ProductoControllerBD {
 
     private final ProductoServiceBD productoService;
-    private final CategoriaService categoriaService; // <-- servicio de categorías
+    private final CategoriaService categoriaService; //
 
     public ProductoControllerBD(ProductoServiceBD productoService, CategoriaService categoriaService) {
         this.productoService = productoService;
         this.categoriaService = categoriaService;
     }
 
+    // @GetMapping
+    //  public List<ProductoBD> listar() {
+    //      return productoService.listarTodos();}
+
     @GetMapping
-    public List<ProductoBD> listar() {
-        return productoService.listarTodos();
+    public List<ProductoDTO> listar() {
+        return productoService.listarTodos()
+                .stream()
+                .map(p -> new ProductoDTO(
+                        p.getId_producto(),
+                        p.getNombre(),
+                        p.getPrecio(),
+                        p.getStock(),
+                        p.getCategoria() != null ? p.getCategoria().getNombre() : null,
+                        p.getVendedor() != null ? p.getVendedor().getNombrePublicoTienda() : null
+                ))
+                .toList();
     }
 
     // Buscar productos por nombre parcial
     @GetMapping("/buscar/{nombre}")
-    public ResponseEntity<List<ProductoBD>> buscarPorNombre(@PathVariable String nombre) {
-        List<ProductoBD> resultados = productoService.buscarPorNombre(nombre);
+    public ResponseEntity<List<ProductoDTO>> buscarPorNombre(@PathVariable String nombre) {
+        List<ProductoDTO> resultados = productoService.buscarPorNombre(nombre).stream()
+                .map(p -> new ProductoDTO(
+                        p.getId_producto(),
+                        p.getNombre(),
+                        p.getPrecio(),
+                        p.getStock(),
+                        p.getCategoria() != null ? p.getCategoria().getNombre() : null,
+                        p.getVendedor() != null ? p.getVendedor().getNombrePublicoTienda() : null,
+                        p.getImagen_url()
+                ))
+                .toList();
         if (resultados.isEmpty()) {
-            return ResponseEntity.noContent().build(); // 204 sin contenido
+            // return ResponseEntity.noContent().build(); // 204 sin contenido
+            throw new ProductoException.NoEncontradoExceptionNombre(nombre);
         }
         return ResponseEntity.ok(resultados);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductoBD> obtener(@PathVariable Long id) {
-        return productoService.obtenerPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<ProductoDTO> obtener(@PathVariable Long id) {
+        var producto = productoService.obtenerPorId(id)
+                .orElseThrow(() -> new ProductoException.NoEncontradoException(id));
+
+        ProductoDTO dto = new ProductoDTO(
+                producto.getId_producto(),
+                producto.getNombre(),
+                producto.getPrecio(),
+                producto.getStock(),
+                producto.getCategoria() != null ? producto.getCategoria().getNombre() : null,
+                producto.getVendedor() != null ? producto.getVendedor().getNombrePublicoTienda() : null,
+                producto.getImagen_url()
+        );
+
+        return ResponseEntity.ok(dto);
     }
-    /* --Antes
-        @PostMapping
-        public ResponseEntity<?> crear(@RequestBody ProductoBD producto) {
-            // Obtener el usuario autenticado desde Spring Security
-            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            if (!(principal instanceof Usuario vendedorActual)) {
-                return ResponseEntity.status(401).body(Map.of(
-                        "error", "No autorizado",
-                        "message", "Usuario no autenticado"
-                ));
-            }
 
-            if (vendedorActual.getRole() != Role.vendedor) {
-                return ResponseEntity.status(403).body(Map.of(
-                        "error", "Prohibido",
-                        "message", "Solo vendedores pueden crear productos"
-                ));
-            }
 
-            producto.setVendedor(vendedorActual);
-            ProductoBD guardado = productoService.guardar(producto);
-            return ResponseEntity.ok(guardado);
-        }
-    */
-// Ahora
+
+
+
+    // crear producto solo vendedor
     @PostMapping
     public ResponseEntity<?> crear(@RequestBody Map<String, Object> requestBody) {
         // Usuario autenticado
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!(principal instanceof Usuario vendedorActual)) {
-            return ResponseEntity.status(401).body(Map.of(
-                    "error", "No autorizado",
-                    "message", "Usuario no autenticado"
-            ));
+            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
         }
 
         if (vendedorActual.getRole() != Role.vendedor) {
-            return ResponseEntity.status(403).body(Map.of(
-                    "error", "Prohibido",
-                    "message", "Solo vendedores pueden crear productos"
-            ));
+            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden crear productos");
         }
 
         // Crear producto
@@ -98,18 +107,13 @@ public class ProductoControllerBD {
 
         // Asignar categoría
         if (!requestBody.containsKey("id_categoria")) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Categoría requerida",
-                    "message", "Debes indicar id_categoria"
-            ));
+            throw new ProductoException.DatosInvalidosException("Debes indicar id_categoria");
         }
+
         Long categoriaId = Long.valueOf(requestBody.get("id_categoria").toString());
         var categoriaOpt = categoriaService.obtenerPorId(categoriaId);
         if (categoriaOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Categoría no encontrada",
-                    "message", "No existe categoría con id " + categoriaId
-            ));
+            throw new ProductoException.NoEncontradoExceptionCate(categoriaId);
         }
         producto.setCategoria(categoriaOpt.get());
 
@@ -117,9 +121,6 @@ public class ProductoControllerBD {
         ProductoBD guardado = productoService.guardar(producto);
         return ResponseEntity.ok(guardado);
     }
-
-
-
 
 
     @PutMapping("/{id}")
@@ -132,36 +133,71 @@ public class ProductoControllerBD {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Actualiza una parte de las columnas
+    // Actualiza parcial (Vendedor)
     @PatchMapping("/{id}")
-    public ResponseEntity<ProductoBD> actualizarParcial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
-        return productoService.obtenerPorId(id)
-                .map(producto -> {
-                    updates.forEach((key, value) -> {
-                        switch (key) {
-                            case "nombre":
-                                producto.setNombre((String)value);
-                                break;
-                            case "precio":
-                                producto.setPrecio(Double.valueOf(value.toString()));
-                                break;
-                            case "stock":
-                                producto.setStock(Integer.valueOf(value.toString()));
-                                break;
-                        }
-                    });
-                    return ResponseEntity.ok(productoService.guardar(producto));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Object> actualizarParcial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        // Obtener usuario autenticado
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof Usuario vendedorActual)) {
+            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
+        }
+
+        if (vendedorActual.getRole() != Role.vendedor) {
+            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden actualizar productos");
+        }
+        var productoOpt = productoService.obtenerPorId(id);
+
+        if (productoOpt.isEmpty()) {
+            throw new ProductoException.NoEncontradoException(id);
+        }
+
+        ProductoBD producto = productoOpt.get();
+
+        // Verificar que pertenece al vendedor actual
+        if (!producto.getVendedor().getId().equals(vendedorActual.getId())) {
+            throw new ProductoException.AccesoProhibidoException("No puedes modificar productos de otro vendedor");
+        }
+
+        // Aplicar cambios parciales
+        updates.forEach((key, value) -> {
+            switch (key) {
+                case "nombre" -> producto.setNombre((String) value);
+                case "precio" -> producto.setPrecio(Double.valueOf(value.toString()));
+                case "stock" -> producto.setStock(Integer.valueOf(value.toString()));
+            }
+        });
+
+        ProductoBD actualizado = productoService.guardar(producto);
+        return ResponseEntity.ok(actualizado);
     }
 
-
+    // Elimna producto solo vendedor
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        if (productoService.obtenerPorId(id).isPresent()) {
-            productoService.eliminar(id);
-            return ResponseEntity.noContent().build();
+    public ResponseEntity<Object> eliminar(@PathVariable Long id) {
+        // Usuario autenticado
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof Usuario vendedorActual)) {
+            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
         }
-        return ResponseEntity.notFound().build();
+
+        if (vendedorActual.getRole() != Role.vendedor) {
+            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden eliminar productos");
+        }
+
+        var productoOpt = productoService.obtenerPorId(id);
+
+        if (productoOpt.isEmpty()) {
+            throw new ProductoException.NoEncontradoException(id);
+        }
+
+        ProductoBD producto = productoOpt.get();
+
+        // Verificar producto pertenece al vendedor actual
+        if (!producto.getVendedor().getId().equals(vendedorActual.getId())) {
+            throw new ProductoException.AccesoProhibidoException("No puedes eliminar productos de otro vendedor");
+        }
+
+        productoService.eliminar(id);
+        return ResponseEntity.noContent().build(); // 204
     }
 }

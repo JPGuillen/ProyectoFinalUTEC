@@ -12,4 +12,3 @@ public interface ProductoRepository extends JpaRepository<ProductoBD, Long> {
     List<ProductoBD> buscarPorNombre(String nombre);
 
 }
-

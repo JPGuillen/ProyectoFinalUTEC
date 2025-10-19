@@ -1,27 +1,30 @@
 
 package com.julygt.ProyectoFinalUTEC.Producto;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import lombok.Setter;
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 
 public class ProductoDTO {
-    @Setter
+    private Long id;
     private String nombre;
-    private Double precioBase;
+    private Double precio;
+    private Integer stock;
+    private String categoria;
+    private String vendedor;
+    private String imagenUrl;
 
-    public ProductoDTO(){}
 
-    public  ProductoDTO( String nombre, Double precioBase){
-        this.nombre =nombre;
-        this.precioBase =precioBase;
-
-    }
-
-    public Double getprecioBase() {
-        return precioBase;
-    }
-
-    public void setprecioBase(Double precioBase) {
-        this.precioBase = precioBase;
+    public ProductoDTO(Long id, String nombre, Double precio, Integer stock, String categoria, String vendedor) {
+        this.id = id;
+        this.nombre = nombre;
+        this.precio = precio;
+        this.stock = stock;
+        this.categoria = categoria;
+        this.vendedor = vendedor;
     }
 
 }
