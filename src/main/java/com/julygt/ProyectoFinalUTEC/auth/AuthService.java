@@ -46,12 +46,12 @@ public class AuthService {
         usuario.setRole(request.getRole());
 
         // Ajuste para clientes: nombrePublicoTienda debe ser null
-        if (request.getRole() == Role.cliente) {
+        if (request.getRole() == Role.CLIENTE) {
             usuario.setNombrePublicoTienda(null);
         }
 
         // Validación condicional: vendedores deben tener nombre de tienda
-        if (request.getRole() == Role.vendedor) {
+        if (request.getRole() == Role.VENDEDOR) {
             if (request.getNombreTienda() == null || request.getNombreTienda().isBlank()) {
                 throw new AuthException.InvalidDataException(
                         "El nombre de la tienda es obligatorio para vendedores"

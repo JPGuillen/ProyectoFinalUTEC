@@ -14,7 +14,7 @@ public class CategoriaService {
     }
 
     public List<Categoria> listarTodas() {
-        return categoriaRepository.findAll();
+        return categoriaRepository.findAll(); //global
     }
 
     public Optional<Categoria> obtenerPorId(Long id) {
@@ -32,6 +32,7 @@ public class CategoriaService {
     public Optional<Categoria> obtenerPorNombre(String nombre) {
         return categoriaRepository.findFirstByNombreContainingIgnoreCase(nombre);
     }
+
 
 }
 

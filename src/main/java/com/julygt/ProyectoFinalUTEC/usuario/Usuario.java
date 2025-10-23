@@ -46,7 +46,7 @@ public class Usuario implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rol")
-    private Role role = Role.cliente;
+    private Role role = Role.CLIENTE;
 
     // CAMPO AGREGADO X OBSERVACION CARLOS
     @Column(name = "nombre_publico_tienda")
@@ -63,7 +63,7 @@ public class Usuario implements UserDetails {
     // Validación condicional: si es vendedor, debe tener nombrePublicoTienda
     @AssertTrue(message = "El nombre de la tienda es obligatorio para vendedores")
     public boolean isNombreTiendaValido() {
-        return role != Role.vendedor || (nombrePublicoTienda != null && !nombrePublicoTienda.isBlank());
+        return role != Role.VENDEDOR || (nombrePublicoTienda != null && !nombrePublicoTienda.isBlank());
     }
 
     // UserDetails (Spring Security)
