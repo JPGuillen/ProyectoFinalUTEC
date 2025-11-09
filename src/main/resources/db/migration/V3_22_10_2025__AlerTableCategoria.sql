@@ -1,4 +1,3 @@
-
 -- Restricción adicional (opcional)
 -- Evitar nombres duplicados dentro del mismo vendedor, pero no entre vendedores:
 
