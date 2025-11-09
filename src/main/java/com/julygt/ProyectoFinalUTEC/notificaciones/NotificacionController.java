@@ -1,49 +1,46 @@
 package com.julygt.ProyectoFinalUTEC.notificaciones;
 
-import org.springframework.http.ResponseEntity;
+import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import java.util.HashMap;
+import org.springframework.http.ResponseEntity;
+
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/notificaciones")
+@RequiredArgsConstructor
 public class NotificacionController {
 
     private final NotificacionService notificacionService;
-
-    public NotificacionController(NotificacionService notificacionService) {
-        this.notificacionService = notificacionService;
-    }
+    private final UsuarioRepository usuarioRepository;
 
     @GetMapping
-    public List<Notificacion> listar() { return notificacionService.listarTodas(); }
+    public List<NotificacionDTO> listar(Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Notificacion> obtener(@PathVariable Long id) {
-        return notificacionService.obtenerPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        // ✅ Convertimos a DTO antes de devolver
+        return notificacionService.listarPorUsuario(usuario)
+                .stream()
+                .map(NotificacionDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
-    @PostMapping
-    public Notificacion crear(@RequestBody Notificacion notificacion) {
-        return notificacionService.guardar(notificacion);
+    @PutMapping("/{id}/leida")
+    public ResponseEntity<Map<String, String>> marcarLeida(@PathVariable Long id) {
+        notificacionService.marcarComoLeida(id);
+
+        Map<String, String> respuesta = new HashMap<>();
+        respuesta.put("mensaje", "Notificación leída");
+
+        return ResponseEntity.ok(respuesta);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Notificacion> actualizar(@PathVariable Long id, @RequestBody Notificacion notificacion) {
-        return notificacionService.obtenerPorId(id)
-                .map(n -> {
-                    n.setMensaje(notificacion.getMensaje());
-                    n.setLeido(notificacion.getLeido());
-                    return ResponseEntity.ok(notificacionService.guardar(n));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        notificacionService.eliminar(id);
-        return ResponseEntity.noContent().build();
-    }
 }
 

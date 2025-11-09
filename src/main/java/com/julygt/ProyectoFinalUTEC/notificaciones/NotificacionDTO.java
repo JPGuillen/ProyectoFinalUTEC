@@ -1,19 +1,25 @@
 package com.julygt.ProyectoFinalUTEC.notificaciones;
 
-import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class NotificacionDTO {
-    private Long id_notificacion;
-    private Usuario usuario;
-    private String mensaje;
-    private LocalDateTime fecha;
-    private boolean leida;
-}
 
+    private Long id;
+    private String mensaje;
+    private boolean leido;
+    private LocalDateTime fechaCreacion;
+    private Long idUsuario;
+
+    // Conversión de entidad a DTO
+    public static NotificacionDTO fromEntity(Notificacion notificacion) {
+        NotificacionDTO dto = new NotificacionDTO();
+        dto.setId(notificacion.getId());
+        dto.setMensaje(notificacion.getMensaje());
+        dto.setLeido(notificacion.isLeido());
+        dto.setFechaCreacion(notificacion.getFechaCreacion());
+        dto.setIdUsuario(notificacion.getUsuario().getId());
+        return dto;
+    }
+}

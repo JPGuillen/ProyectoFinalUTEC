@@ -3,6 +3,8 @@ package com.julygt.ProyectoFinalUTEC.config;
 import com.julygt.ProyectoFinalUTEC.Producto.ProductoException;
 import com.julygt.ProyectoFinalUTEC.auth.AuthDTO;
 import com.julygt.ProyectoFinalUTEC.auth.AuthException;
+import com.julygt.ProyectoFinalUTEC.pedidos.PedidoException;
+import com.julygt.ProyectoFinalUTEC.pagos.PagoException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -16,6 +18,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ==================== AUTH ====================
     @ExceptionHandler(AuthException.UserAlreadyExistsException.class)
     public ResponseEntity<AuthDTO.ErrorResponse> handleUserAlreadyExists(AuthException.UserAlreadyExistsException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -28,6 +31,7 @@ public class GlobalExceptionHandler {
                 .body(new AuthDTO.ErrorResponse("INVALID_CREDENTIALS", e.getMessage(), 401));
     }
 
+    // ==================== VALIDACIONES ====================
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -39,14 +43,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errors);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<AuthDTO.ErrorResponse> handleGenericException(Exception e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new AuthDTO.ErrorResponse("INTERNAL_ERROR", "Error interno del servidor", 500));
-    }
-
-    // PRODUCTOS
-
+    // ==================== PRODUCTOS ====================
     @ExceptionHandler(ProductoException.NoAutorizadoException.class)
     public ResponseEntity<AuthDTO.ErrorResponse> handleProductoNoAutorizado(ProductoException.NoAutorizadoException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -71,4 +68,41 @@ public class GlobalExceptionHandler {
                 .body(new AuthDTO.ErrorResponse("PRODUCT_BAD_REQUEST", e.getMessage(), 400));
     }
 
+    // ==================== PEDIDOS ====================
+    @ExceptionHandler(PedidoException.NotFoundException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handlePedidoNotFound(PedidoException.NotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new AuthDTO.ErrorResponse("ORDER_NOT_FOUND", e.getMessage(), 404));
+    }
+
+    @ExceptionHandler(PedidoException.BusinessException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handlePedidoBusiness(PedidoException.BusinessException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new AuthDTO.ErrorResponse("ORDER_BUSINESS_ERROR", e.getMessage(), 400));
+    }
+
+    // ==================== PAGOS ====================
+    @ExceptionHandler(PagoException.PedidoNoEncontradoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handlePagoPedidoNoEncontrado(PagoException.PedidoNoEncontradoException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new AuthDTO.ErrorResponse("PAYMENT_ORDER_NOT_FOUND", e.getMessage(), 400));
+    }
+
+    @ExceptionHandler(PagoException.MetodoPagoInvalidoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handlePagoMetodoInvalido(PagoException.MetodoPagoInvalidoException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new AuthDTO.ErrorResponse("PAYMENT_INVALID_METHOD", e.getMessage(), 400));
+    }
+    // Vendedor confirma pago
+    @ExceptionHandler(PagoException.PagoFallidoException.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handlePagoFallido(PagoException.PagoFallidoException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new AuthDTO.ErrorResponse("PAYMENT_FORBIDDEN", e.getMessage(), 403));
+    }
+    // ==================== ERRORES GENERALES ====================
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<AuthDTO.ErrorResponse> handleGenericException(Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new AuthDTO.ErrorResponse("INTERNAL_ERROR", "Error interno del servidor", 500));
+    }
 }

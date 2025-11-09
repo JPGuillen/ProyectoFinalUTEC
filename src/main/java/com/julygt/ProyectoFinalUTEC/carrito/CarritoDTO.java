@@ -1,11 +1,8 @@
 package com.julygt.ProyectoFinalUTEC.carrito;
 
-import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
-import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 import java.util.List;
 
 // DTO para exponer solo lo necesario al frontend
@@ -15,15 +12,18 @@ import java.util.List;
 public class CarritoDTO {
 
     private Long id_carrito;
-    private Usuario cliente;
-    private List<DetalleDTO> detalles;
+    private Long id_cliente;
+    private String nombreCliente;  // opcional, para mostrar en el frontend
+    List<DetalleDTO> detalles;
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class DetalleDTO {
         private Long id_detalle;
-        private ProductoBD producto;
+//        private ProductoBD producto; // NO es correcto por la exposicion de datoss
+        private String nombreProducto; // útil para el frontend
+        private Double precio;  // se obtiene del producto
         private Integer cantidad;
     }
 }

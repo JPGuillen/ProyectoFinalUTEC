@@ -1,101 +1,121 @@
-
 package com.julygt.ProyectoFinalUTEC.pedidos;
 
+import com.julygt.ProyectoFinalUTEC.usuario.Role;
+import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/pedidos")
+@RequestMapping("api/pedidos")
+@RequiredArgsConstructor
 public class PedidoController {
 
     private final PedidoService pedidoService;
+    private final UsuarioRepository usuarioRepository;
 
-    public PedidoController(PedidoService pedidoService) {
-        this.pedidoService = pedidoService;
+    // 🔹 1. Crear pedido desde carrito (solo CLIENTE autenticado)
+    @PostMapping("/crear")
+    public ResponseEntity<?> crearPedidoDesdeCarrito  (
+                                            Authentication auth,
+                                    @RequestBody Map <String,String> body) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new PedidoException.NotFoundException("Usuario no encontrado."));
+
+        // Validación: solo CLIENTE puede crear pedidos
+        if (usuario.getRole() != Role.CLIENTE) {
+            throw new PedidoException.BusinessException("Solo los clientes pueden generar pedidos.");
+        }
+
+        String direccionEnvio = body.get("direccionEnvio");
+        if (direccionEnvio == null || direccionEnvio.isBlank()) {
+            throw new PedidoException.BusinessException("La dirección de envío es obligatoria.");
+        }
+
+        Pedido nuevo = pedidoService.crearPedidoDesdeCarrito(auth, direccionEnvio);
+        return ResponseEntity.ok(Map.of(
+                "mensaje", "Pedido generado correctamente.",
+                "id_pedido", nuevo.getId(),
+                "total", nuevo.getTotal(),
+                "direccion_envio", nuevo.getDireccionEnvio()
+        ));
     }
 
-    @GetMapping
-    public List<PedidoDTO> listar() {
-        return pedidoService.listarTodos()
-                .stream()
-                .map(p -> new PedidoDTO(
-                        p.getId_pedido(),
-                        p.getCliente(),
-                        p.getFecha_pedido(),
-                        p.getEstado(),
-                        p.getDetalles().stream()
-                                .map(d -> new PedidoDTO.DetalleDTO(
-                                        d.getId_detalle(),
-                                        d.getProducto(),
-                                        d.getCantidad()
-                                ))
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
+    // 🔹 2. Listar pedidos del usuario autenticado
+    @GetMapping("/mis-pedidos")
+    public ResponseEntity<List<PedidoDTO>> listarPedidosUsuario(Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new PedidoException.NotFoundException("Usuario no encontrado."));
+
+        List<Pedido> pedidos = pedidoService.listarPedidosUsuario(auth);
+        List<PedidoDTO> pedidosDTO = pedidos.stream()
+                .map(PedidoDTO::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(pedidosDTO);
     }
 
+    // 🔹 3. Obtener pedido por ID — CLIENTE solo puede ver los suyos
     @GetMapping("/{id}")
-    public ResponseEntity<PedidoDTO> obtener(@PathVariable Long id) {
-        return pedidoService.obtenerPorId(id)
-                .map(p -> new PedidoDTO(
-                        p.getId_pedido(),
-                        p.getCliente(),
-                        p.getFecha_pedido(),
-                        p.getEstado(),
-                        p.getDetalles().stream()
-                                .map(d -> new PedidoDTO.DetalleDTO(
-                                        d.getId_detalle(),
-                                        d.getProducto(),
-                                        d.getCantidad()
-                                ))
-                                .collect(Collectors.toList())
-                ))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<PedidoDTO> obtenerPedidoPorId(@PathVariable Long id, Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new PedidoException.NotFoundException("Usuario no encontrado."));
+
+        Pedido pedido = pedidoService.obtenerPedidoPorIdYUsuario(id, auth);
+
+        // CLIENTE: solo sus pedidos / VENDEDOR: puede ver si está relacionado a productos suyos
+        if (usuario.getRole() == Role.CLIENTE) {
+            if (!pedido.getUsuario().getId().equals(usuario.getId())) {
+                throw new PedidoException.BusinessException("No puedes acceder a pedidos de otro usuario.");
+            }
+        }
+
+        return ResponseEntity.ok(PedidoDTO.fromEntity(pedido));
     }
 
-    @PostMapping
-    public PedidoDTO crear(@RequestBody PedidoDTO dto) {
-        Pedido pedido = new Pedido();
-        pedido.setCliente(dto.getCliente());
-        pedido.setFecha_pedido(LocalDateTime.now());
-        pedido.setEstado(dto.getEstado());
+    // 🔹 4. Listar pedidos por vendedor autenticado
+    // (Vendedor puede ver pedidos donde haya vendido productos)
+    @GetMapping("/vendedor")
+    public ResponseEntity<?> listarPedidosPorVendedor(Authentication auth) {
+        Usuario vendedor = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new PedidoException.NotFoundException("Usuario no encontrado."));
 
-        List<PedidoDetalle> detalles = dto.getDetalles()
-                .stream()
-                .map(d -> {
-                    PedidoDetalle detalle = new PedidoDetalle();
-                    detalle.setProducto(d.getProducto());
-                    detalle.setCantidad(d.getCantidad());
-                    detalle.setPedido(pedido);
-                    return detalle;
-                }).toList();
+        if (vendedor.getRole() != Role.VENDEDOR) {
+            throw new PedidoException.BusinessException("Solo los vendedores pueden acceder a esta lista.");
+        }
 
-        pedido.setDetalles(detalles);
-        Pedido guardado = pedidoService.guardar(pedido);
+        List<Pedido> pedidos = pedidoService.listarPedidosPorVendedor(vendedor.getId());
+        List<PedidoDTO> pedidosDTO = pedidos.stream()
+                .map(PedidoDTO::fromEntity)
+                .toList();
 
-        return new PedidoDTO(
-                guardado.getId_pedido(),
-                guardado.getCliente(),
-                guardado.getFecha_pedido(),
-                guardado.getEstado(),
-                guardado.getDetalles().stream()
-                        .map(d -> new PedidoDTO.DetalleDTO(
-                                d.getId_detalle(),
-                                d.getProducto(),
-                                d.getCantidad()
-                        ))
-                        .collect(Collectors.toList())
-        );
+        return ResponseEntity.ok(pedidosDTO);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        pedidoService.eliminar(id);
-        return ResponseEntity.noContent().build();
+    // 🔹 5. Cancelar pedido (solo CLIENTE y si está pendiente)
+    @PatchMapping("/{id}/cancelar")
+    public ResponseEntity<?> cancelarPedido(@PathVariable Long id, Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new PedidoException.NotFoundException("Usuario no encontrado."));
+
+        if (usuario.getRole() != Role.CLIENTE) {
+            throw new PedidoException.BusinessException("Solo los clientes pueden cancelar pedidos.");
+        }
+
+        Pedido pedido = pedidoService.obtenerPedidoPorIdYUsuario(id, auth);
+
+        if (!"PENDIENTE".equalsIgnoreCase(pedido.getEstado())) {
+            throw new PedidoException.BusinessException("Solo se pueden cancelar pedidos pendientes.");
+        }
+
+        pedido.setEstado("CANCELADO");
+        pedidoService.actualizarEstado(pedido);
+
+        return ResponseEntity.ok(Map.of("mensaje", "Pedido cancelado correctamente."));
     }
 }

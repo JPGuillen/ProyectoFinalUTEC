@@ -1,35 +1,134 @@
 package com.julygt.ProyectoFinalUTEC.carrito;
 
+import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
+import com.julygt.ProyectoFinalUTEC.Producto.ProductoRepository;
+import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class CarritoService {
 
     private final CarritoRepository carritoRepository;
+    private final CarritoDetalleRepository detalleRepository;
+    private final ProductoRepository productoRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public CarritoService(CarritoRepository carritoRepository) {
-        this.carritoRepository = carritoRepository;
+    // Obtener o crear carrito
+    private Carrito obtenerOCrearCarrito(Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new CarritoException.NotFoundException("Usuario no encontrado"));
+
+        return carritoRepository.findByUsuario(usuario)
+                .orElseGet(() -> {
+                    Carrito nuevo = new Carrito();
+                    nuevo.setUsuario(usuario);
+                    nuevo.setDetalles(new ArrayList<>());
+                    return carritoRepository.save(nuevo);
+                });
     }
 
-    public List<Carrito> listarTodos() {
-        return carritoRepository.findAll();
+    // Obtener carrito
+    public CarritoDTO obtenerCarrito(Authentication auth) {
+        Carrito carrito = obtenerOCrearCarrito(auth);
+        return convertirACarritoDTO(carrito);
     }
 
-    public Optional<Carrito> obtenerPorId(Long id) {
-        return carritoRepository.findById(id);
+    // Agregar producto
+    public CarritoDTO agregarProducto(Authentication auth, Long productoId, int cantidad) {
+        Carrito carrito = obtenerOCrearCarrito(auth);
+
+        ProductoBD producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new CarritoException.NotFoundException("Producto no encontrado"));
+
+        CarritoDetalle detalleExistente = carrito.getDetalles().stream()
+                .filter(d -> d.getProducto().getId().equals(productoId))
+                .findFirst()
+                .orElse(null);
+
+        if (detalleExistente != null) {
+            detalleExistente.setCantidad(detalleExistente.getCantidad() + cantidad);
+        } else {
+            CarritoDetalle nuevoDetalle = new CarritoDetalle();
+            nuevoDetalle.setCarrito(carrito);
+            nuevoDetalle.setProducto(producto);
+            nuevoDetalle.setCantidad(cantidad);
+            carrito.getDetalles().add(nuevoDetalle);
+        }
+
+        carritoRepository.save(carrito);
+        return convertirACarritoDTO(carrito);
     }
 
-    @Transactional
-    public Carrito guardar(Carrito carrito) {
-        return carritoRepository.save(carrito);
+    // Actualizar cantidad total
+    public CarritoDTO actualizarCantidad(Authentication auth, Long productoId, int nuevaCantidad) {
+        Carrito carrito = obtenerOCrearCarrito(auth);
+
+        CarritoDetalle detalle = carrito.getDetalles().stream()
+                .filter(d -> d.getProducto().getId().equals(productoId))
+                .findFirst()
+                .orElseThrow(() -> new CarritoException.NotFoundException("Producto no está en el carrito"));
+
+        detalle.setCantidad(nuevaCantidad);
+        carritoRepository.save(carrito);
+        return convertirACarritoDTO(carrito);
     }
 
-    @Transactional
-    public void eliminar(Long id) {
-        carritoRepository.deleteById(id);
+    // Disminuir parcialmente cantidad (nuevo)
+    public CarritoDTO disminuirCantidad(Authentication auth, Long productoId, int cantidad) {
+        Carrito carrito = obtenerOCrearCarrito(auth);
+
+        CarritoDetalle detalle = carrito.getDetalles().stream()
+                .filter(d -> d.getProducto().getId().equals(productoId))
+                .findFirst()
+                .orElseThrow(() -> new CarritoException.NotFoundException("Producto no está en el carrito"));
+
+        int nuevaCantidad = detalle.getCantidad() - cantidad;
+        if (nuevaCantidad <= 0) {
+            carrito.getDetalles().remove(detalle); // elimina si queda en 0
+        } else {
+            detalle.setCantidad(nuevaCantidad);
+        }
+
+        carritoRepository.save(carrito);
+        return convertirACarritoDTO(carrito);
+    }
+
+    // Eliminar completamente un producto
+    public CarritoDTO eliminarProducto(Authentication auth, Long productoId) {
+        Carrito carrito = obtenerOCrearCarrito(auth);
+
+        carrito.getDetalles().removeIf(detalle ->
+                detalle.getProducto().getId().equals(productoId)
+        );
+
+        carritoRepository.save(carrito);
+        return convertirACarritoDTO(carrito);
+    }
+
+    // Conversión a DTO
+    private CarritoDTO convertirACarritoDTO(Carrito carrito) {
+        CarritoDTO dto = new CarritoDTO();
+        dto.setId_carrito(carrito.getId());
+        dto.setId_cliente(carrito.getUsuario().getId());
+        dto.setNombreCliente(carrito.getUsuario().getUsername());
+
+        List<CarritoDTO.DetalleDTO> detallesDTO = carrito.getDetalles().stream()
+                .map(detalle -> new CarritoDTO.DetalleDTO(
+                        detalle.getId(),
+                        detalle.getProducto().getNombre(),
+                        detalle.getProducto().getPrecio(),
+                        detalle.getCantidad()
+                ))
+                .toList();
+
+        dto.setDetalles(detallesDTO);
+        return dto;
     }
 }

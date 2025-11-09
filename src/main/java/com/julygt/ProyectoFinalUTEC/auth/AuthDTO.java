@@ -39,11 +39,13 @@ public class AuthDTO {
 
         @NotBlank(message = "La contraseña es obligatoria")
         @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
-        //@JsonProperty("password")   // permite mapear el JSON "password" a este campo
         private String contrasena;
 
+        // ✅ Permite que el JSON use la clave "rol" (coincide con lo que envía el frontend)
+        @JsonProperty("rol")
         @NotNull(message = "El rol es obligatorio")
         private Role role;             // CLIENTE o VENDEDOR
+
         private String nombreTienda;   // obligatorio solo si role = VENDEDOR
     }
 

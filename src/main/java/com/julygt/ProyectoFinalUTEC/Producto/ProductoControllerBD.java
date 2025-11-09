@@ -1,203 +1,282 @@
 package com.julygt.ProyectoFinalUTEC.Producto;
 
-import com.julygt.ProyectoFinalUTEC.categorias.CategoriaService;
+import com.julygt.ProyectoFinalUTEC.categorias.Categoria;
 import com.julygt.ProyectoFinalUTEC.usuario.Role;
 import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/productosBD") // Esto viene de la BD(Productos)
-
+@RequestMapping("api/productosBD")
+@RequiredArgsConstructor
 public class ProductoControllerBD {
 
-    private final ProductoServiceBD productoService;
-    private final CategoriaService categoriaService; //
+    private final ProductoServiceBD productoServiceBD;
+    private final UsuarioRepository usuarioRepository;
+    //private final CategoriaRepository categoriaRepository;
+    private final AlmacenamientoService almacenamientoService;
 
-    public ProductoControllerBD(ProductoServiceBD productoService, CategoriaService categoriaService) {
-        this.productoService = productoService;
-        this.categoriaService = categoriaService;
-    }
-
-  // @GetMapping
-  //  public List<ProductoBD> listar() {
-  //      return productoService.listarTodos();}
-
+    // LISTAR PRODUCTOS (cliente → todos, vendedor → solo suyos)
     @GetMapping
-    public List<ProductoDTO> listar() {
-        return productoService.listarTodos()
-                .stream()
-                .map(p -> new ProductoDTO(
-                        p.getId_producto(),
-                        p.getNombre(),
-                        p.getPrecio(),
-                        p.getStock(),
-                        p.getCategoria() != null ? p.getCategoria().getNombre() : null,
-                        p.getVendedor() != null ? p.getVendedor().getNombrePublicoTienda() : null
-                ))
-                .toList();
-    }
+    public ResponseEntity<?> listarProductos(Authentication auth) {
+        try {
+            if (auth == null) {
+                throw new RuntimeException("No estás autenticado.");
+            }
 
-    // Buscar productos por nombre parcial
-    @GetMapping("/buscar/{nombre}")
-    public ResponseEntity<List<ProductoDTO>> buscarPorNombre(@PathVariable String nombre) {
-            List<ProductoDTO> resultados = productoService.buscarPorNombre(nombre).stream()
-                .map(p -> new ProductoDTO(
-                        p.getId_producto(),
-                        p.getNombre(),
-                        p.getPrecio(),
-                        p.getStock(),
-                        p.getCategoria() != null ? p.getCategoria().getNombre() : null,
-                        p.getVendedor() != null ? p.getVendedor().getNombrePublicoTienda() : null,
-                        p.getImagen_url()
-                ))
-                .toList();
-        if (resultados.isEmpty()) {
-           // return ResponseEntity.noContent().build(); // 204 sin contenido
-            throw new ProductoException.NoEncontradoExceptionNombre(nombre);
+            Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
+
+            List<ProductoBD> productos = productoServiceBD.listarTodos();
+
+            List<ProductoDTO> dtoList = productos.stream()
+                    .map(p -> {
+                        if (usuario.getRole() == Role.VENDEDOR &&
+                                p.getVendedor() != null &&
+                                p.getVendedor().getId() != null &&
+                                p.getVendedor().getId().equals(usuario.getId())) {
+                            return ProductoDTO.fromEntityVendedor(p);
+                        } else {
+                            return ProductoDTO.fromEntityCliente(p);
+                        }
+                    })
+                    .filter(p -> p != null)
+                    .toList();
+
+            return ResponseEntity.ok(dtoList);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Error interno al listar productos",
+                    "detalle", e.getMessage()
+            ));
         }
-        return ResponseEntity.ok(resultados);
     }
 
+    // OBTENER PRODUCTO POR ID
     @GetMapping("/{id}")
-    public ResponseEntity<ProductoDTO> obtener(@PathVariable Long id) {
-        var producto = productoService.obtenerPorId(id)
-                .orElseThrow(() -> new ProductoException.NoEncontradoException(id));
+    public ResponseEntity<ProductoDTO> obtenerProductoPorId(@PathVariable Long id, Authentication auth) {
+        if (auth == null) {
+            throw new RuntimeException("No estás autenticado.");
+        }
 
-        ProductoDTO dto = new ProductoDTO(
-                producto.getId_producto(),
-                producto.getNombre(),
-                producto.getPrecio(),
-                producto.getStock(),
-                producto.getCategoria() != null ? producto.getCategoria().getNombre() : null,
-                producto.getVendedor() != null ? producto.getVendedor().getNombrePublicoTienda() : null,
-                producto.getImagen_url()
-        );
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
+
+        ProductoBD producto = productoServiceBD.obtenerPorId(id)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado."));
+
+        ProductoDTO dto = (usuario.getRole() == Role.VENDEDOR
+                && producto.getVendedor() != null
+                && producto.getVendedor().getId().equals(usuario.getId()))
+                ? ProductoDTO.fromEntityVendedor(producto)
+                : ProductoDTO.fromEntityCliente(producto);
 
         return ResponseEntity.ok(dto);
     }
 
-
-
-
-
-// crear producto solo vendedor
-    @PostMapping
-    public ResponseEntity<?> crear(@RequestBody Map<String, Object> requestBody) {
-        // Usuario autenticado
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof Usuario vendedorActual)) {
-            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
+    // BUSCAR PRODUCTOS POR NOMBRE
+    @GetMapping("/buscar/{nombre}")
+    public ResponseEntity<List<ProductoDTO>> buscarPorNombre(@PathVariable String nombre, Authentication auth) {
+        if (auth == null) {
+            throw new RuntimeException("No estás autenticado.");
         }
 
-        if (vendedorActual.getRole() != Role.vendedor) {
-            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden crear productos");
-        }
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
 
-        // Crear producto
-        ProductoBD producto = new ProductoBD();
-        producto.setNombre((String) requestBody.get("nombre"));
-        producto.setPrecio(Double.valueOf(requestBody.get("precio").toString()));
-        producto.setStock(Integer.valueOf(requestBody.get("stock").toString()));
-        producto.setVendedor(vendedorActual);
+        List<ProductoBD> productos = productoServiceBD.buscarPorNombre(nombre);
 
-        // Asignar categoría
-        if (!requestBody.containsKey("id_categoria")) {
-            throw new ProductoException.DatosInvalidosException("Debes indicar id_categoria");
-        }
-
-        Long categoriaId = Long.valueOf(requestBody.get("id_categoria").toString());
-        var categoriaOpt = categoriaService.obtenerPorId(categoriaId);
-        if (categoriaOpt.isEmpty()) {
-            throw new ProductoException.NoEncontradoExceptionCate(categoriaId);
-        }
-        producto.setCategoria(categoriaOpt.get());
-
-        // Guardar producto
-        ProductoBD guardado = productoService.guardar(producto);
-        return ResponseEntity.ok(guardado);
-    }
-
-
-    @PutMapping("/{id}")
-    public ResponseEntity<ProductoBD> actualizar(@PathVariable Long id, @RequestBody ProductoBD producto) {
-        return productoService.obtenerPorId(id)
+        List<ProductoDTO> dtoList = productos.stream()
                 .map(p -> {
-                    producto.setId_producto(id);
-                    return ResponseEntity.ok(productoService.guardar(producto));
+                    if (usuario.getRole() == Role.VENDEDOR && p.getVendedor() != null
+                            && p.getVendedor().getId().equals(usuario.getId())) {
+                        return ProductoDTO.fromEntityVendedor(p);
+                    } else {
+                        return ProductoDTO.fromEntityCliente(p);
+                    }
                 })
-                .orElse(ResponseEntity.notFound().build());
+                .toList();
+
+        return ResponseEntity.ok(dtoList);
     }
 
-    // Actualiza parcial (Vendedor)
-    @PatchMapping("/{id}")
-    public ResponseEntity<Object> actualizarParcial(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
-        // Obtener usuario autenticado
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof Usuario vendedorActual)) {
-            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
-        }
 
-        if (vendedorActual.getRole() != Role.vendedor) {
-            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden actualizar productos");
-        }
-        var productoOpt = productoService.obtenerPorId(id);
+    // CREAR PRODUCTO (solo VENDEDOR)
+    @PostMapping("/crear")
+    public ResponseEntity<?> crearProducto(
+            @RequestParam("nombre") String nombre,
+            @RequestParam("precio") Double precio,
+            @RequestParam("stock") Integer stock,
+            @RequestParam("idCategoria") Long idCategoria,
+            @RequestParam(value = "imagen", required = false) MultipartFile imagen,
+            Authentication auth) {
 
-        if (productoOpt.isEmpty()) {
-            throw new ProductoException.NoEncontradoException(id);
-        }
-
-        ProductoBD producto = productoOpt.get();
-
-        // Verificar que pertenece al vendedor actual
-        if (!producto.getVendedor().getId().equals(vendedorActual.getId())) {
-            throw new ProductoException.AccesoProhibidoException("No puedes modificar productos de otro vendedor");
-        }
-
-        // Aplicar cambios parciales
-        updates.forEach((key, value) -> {
-            switch (key) {
-                case "nombre" -> producto.setNombre((String) value);
-                case "precio" -> producto.setPrecio(Double.valueOf(value.toString()));
-                case "stock" -> producto.setStock(Integer.valueOf(value.toString()));
+        try {
+            if (auth == null) {
+                throw new RuntimeException("No estás autenticado.");
             }
-        });
 
-        ProductoBD actualizado = productoService.guardar(producto);
-        return ResponseEntity.ok(actualizado);
+            // 🔹 Buscar al usuario autenticado
+            Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
+
+            // 🔹 Validar que sea vendedor
+            if (usuario.getRole() != Role.VENDEDOR) {
+                return ResponseEntity.status(403).body(Map.of("error", "Solo los vendedores pueden crear productos."));
+            }
+
+            // 🔹 Obtener la categoría desde el servicio
+            Categoria categoria = productoServiceBD.obtenerCategoriaPorId(idCategoria)
+                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada."));
+
+            // 🔹 Guardar imagen si existe
+            String imagenUrl = null;
+            if (imagen != null && !imagen.isEmpty()) {
+                imagenUrl = almacenamientoService.guardarImagen(imagen);
+            }
+
+            // 🔹 Crear el producto
+            ProductoBD nuevoProducto = new ProductoBD();
+            nuevoProducto.setNombre(nombre);
+            nuevoProducto.setPrecio(precio);
+            nuevoProducto.setStock(stock);
+            nuevoProducto.setCategoria(categoria);
+            nuevoProducto.setVendedor(usuario);
+            nuevoProducto.setImagenUrl(imagenUrl);
+
+            // 🔹 Guardar el producto
+            ProductoBD guardado = productoServiceBD.guardar(nuevoProducto);
+
+            // 🔹 Crear DTO de respuesta evitando NullPointer
+            ProductoDTO respuesta = new ProductoDTO();
+            respuesta.setId(guardado.getId());
+            respuesta.setNombre(guardado.getNombre());
+            respuesta.setPrecio(guardado.getPrecio());
+            respuesta.setStock(guardado.getStock());
+            respuesta.setImagenUrl(guardado.getImagenUrl());
+            respuesta.setNombreCategoria(categoria != null ? categoria.getNombre() : "Sin categoría");
+            respuesta.setNombreVendedor(
+                    usuario != null
+                            ? (usuario.getNombrePublicoTienda() != null
+                            ? usuario.getNombrePublicoTienda()
+                            : usuario.getUsername())
+                            : "Sin vendedor"
+            );
+
+            System.out.println("✅ Producto guardado correctamente: " + guardado);
+
+            return ResponseEntity.status(201).body(Map.of(
+                    "mensaje", "Producto registrado correctamente",
+                    "producto", respuesta
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Ocurrió un error al registrar el producto",
+                    "detalle", e.getMessage()
+            ));
+        }
     }
 
-    // Elimna producto solo vendedor
+
+    // ACTUALIZAR PRODUCTO (VENDEDOR)
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> actualizarProducto(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            Authentication auth) {
+        try {
+            if (auth == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "No estás autenticado."));
+            }
+
+            // Buscar usuario autenticado
+            Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
+
+            // Buscar producto
+            ProductoBD producto = productoServiceBD.obtenerPorId(id)
+                    .orElseThrow(() -> new RuntimeException("Producto no encontrado."));
+
+            // Validar que el vendedor sea el dueño
+            if (usuario.getRole() == Role.VENDEDOR &&
+                    !producto.getVendedor().getId().equals(usuario.getId())) {
+                return ResponseEntity.status(403).body(Map.of("error", "No tienes permiso para modificar este producto."));
+            }
+
+            // ✅ Actualiza solo los campos que vienen en el body
+            if (body.containsKey("nombre")) {
+                producto.setNombre((String) body.get("nombre"));
+            }
+
+            if (body.containsKey("precio")) {
+                Object precio = body.get("precio");
+                if (precio != null) {
+                    producto.setPrecio(Double.valueOf(precio.toString()));
+                }
+            }
+
+            if (body.containsKey("stock")) {
+                Object stock = body.get("stock");
+                if (stock != null) {
+                    producto.setStock(Integer.valueOf(stock.toString()));
+                }
+            }
+
+            if (body.containsKey("idCategoria")) {
+                Long idCategoria = Long.valueOf(body.get("idCategoria").toString());
+                Categoria categoria = productoServiceBD.obtenerCategoriaPorId(idCategoria)
+                        .orElseThrow(() -> new RuntimeException("Categoría no encontrada."));
+                producto.setCategoria(categoria);
+            }
+
+            // Guardar cambios
+            ProductoBD actualizado = productoServiceBD.guardar(producto);
+
+            // Respuesta final
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Producto actualizado correctamente",
+                    "id", actualizado.getId(),
+                    "nombre", actualizado.getNombre(),
+                    "precio", actualizado.getPrecio(),
+                    "stock", actualizado.getStock()
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "INTERNAL_ERROR",
+                    "message", e.getMessage(),
+                    "status", 500
+            ));
+        }
+    }
+
+    // ELIMINAR PRODUCTO (VENDEDOR)
     @DeleteMapping("/{id}")
-    public ResponseEntity<Object> eliminar(@PathVariable Long id) {
-        // Usuario autenticado
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof Usuario vendedorActual)) {
-            throw new ProductoException.NoAutorizadoException("Usuario no autenticado");
+    public ResponseEntity<?> eliminarProducto(@PathVariable Long id, Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado."));
+
+        ProductoBD producto = productoServiceBD.obtenerPorId(id)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado."));
+
+        if (!producto.getVendedor().getId().equals(usuario.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "No tienes permiso para eliminar este producto."));
         }
 
-        if (vendedorActual.getRole() != Role.vendedor) {
-            throw new ProductoException.AccesoProhibidoException("Solo vendedores pueden eliminar productos");
-        }
-
-        var productoOpt = productoService.obtenerPorId(id);
-
-        if (productoOpt.isEmpty()) {
-            throw new ProductoException.NoEncontradoException(id);
-        }
-
-        ProductoBD producto = productoOpt.get();
-
-        // Verificar producto pertenece al vendedor actual
-        if (!producto.getVendedor().getId().equals(vendedorActual.getId())) {
-            throw new ProductoException.AccesoProhibidoException("No puedes eliminar productos de otro vendedor");
-        }
-
-        productoService.eliminar(id);
-        return ResponseEntity.noContent().build(); // 204
+        productoServiceBD.eliminar(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Producto eliminado correctamente."));
     }
 }

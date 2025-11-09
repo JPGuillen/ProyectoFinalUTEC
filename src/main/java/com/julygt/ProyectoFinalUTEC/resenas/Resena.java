@@ -3,51 +3,45 @@ package com.julygt.ProyectoFinalUTEC.resenas;
 import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
 import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "resenas")
 public class Resena {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id_resena;
+    @Column(name = "id_reseña")
+    private Long id;
 
-    @ManyToOne
+    // Relación con producto
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_producto", nullable = false)
     private ProductoBD producto;
 
-    @ManyToOne
+    // Relación con usuario (cliente que deja la reseña)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_usuario", nullable = false)
     private Usuario usuario;
 
-    private Integer calificacion; // 1-5
+    @Min(1)
+    @Max(5)
+    @Column(nullable = false)
+    private int calificacion;
 
     @Column(columnDefinition = "TEXT")
     private String comentario;
 
     @CreationTimestamp
-    private LocalDateTime fecha_creacion;
-
-    // Getters y Setters
-    public Long getId_resena() { return id_resena; }
-    public void setId_resena(Long id_resena) { this.id_resena = id_resena; }
-
-    public ProductoBD getProducto() { return producto; }
-    public void setProducto(ProductoBD producto) { this.producto = producto; }
-
-    public Usuario getUsuario() { return usuario; }
-    public void setUsuario(Usuario usuario) { this.usuario = usuario; }
-
-    public Integer getCalificacion() { return calificacion; }
-    public void setCalificacion(Integer calificacion) { this.calificacion = calificacion; }
-
-    public String getComentario() { return comentario; }
-    public void setComentario(String comentario) { this.comentario = comentario; }
-
-    public LocalDateTime getFecha_creacion() { return fecha_creacion; }
-    public void setFecha_creacion(LocalDateTime fecha_creacion) { this.fecha_creacion = fecha_creacion; }
+    @Column(name = "fecha_creacion", updatable = false)
+    private LocalDateTime fechaCreacion;
 }
-

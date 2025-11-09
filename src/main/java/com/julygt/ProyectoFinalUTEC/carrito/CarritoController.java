@@ -1,92 +1,85 @@
 package com.julygt.ProyectoFinalUTEC.carrito;
 
+import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
+import com.julygt.ProyectoFinalUTEC.usuario.Role;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/carrito")
 public class CarritoController {
 
     private final CarritoService carritoService;
+    private final UsuarioRepository usuarioRepository;
 
-    public CarritoController(CarritoService carritoService) {
+    public CarritoController(CarritoService carritoService, UsuarioRepository usuarioRepository) {
         this.carritoService = carritoService;
+        this.usuarioRepository = usuarioRepository;
     }
 
+    // Método auxiliar — valida que sea CLIENTE
+    private void validarCliente(Authentication auth) {
+        Usuario usuario = usuarioRepository.findByUsername(auth.getName())
+                .orElseThrow(() -> new CarritoException("Usuario no encontrado."));
+        if (usuario.getRole() != Role.CLIENTE) {
+            throw new CarritoException("Solo los clientes pueden acceder al carrito.");
+        }
+    }
+
+    // Obtener carrito del usuario logueado
     @GetMapping
-    public List<CarritoDTO> listar() {
-        return carritoService.listarTodos()
-                .stream()
-                .map(c -> new CarritoDTO(
-                        c.getId_carrito(),
-                        c.getCliente(),
-                        c.getDetalles().stream()
-                                .map(d -> new CarritoDTO.DetalleDTO(
-                                        d.getId_detalle(),
-                                        d.getProducto(),
-                                        d.getCantidad()
-                                ))
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
+    public ResponseEntity<CarritoDTO> obtenerCarrito(Authentication authentication) {
+        validarCliente(authentication);
+        CarritoDTO carrito = carritoService.obtenerCarrito(authentication);
+        return ResponseEntity.ok(carrito);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<CarritoDTO> obtener(@PathVariable Long id) {
-        return carritoService.obtenerPorId(id)
-                .map(c -> new CarritoDTO(
-                        c.getId_carrito(),
-                        c.getCliente(),
-                        c.getDetalles().stream()
-                                .map(d -> new CarritoDTO.DetalleDTO(
-                                        d.getId_detalle(),
-                                        d.getProducto(),
-                                        d.getCantidad()
-                                ))
-                                .collect(Collectors.toList())
-                ))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    // Agregar producto al carrito
+    @PostMapping("/agregar")
+    public ResponseEntity<CarritoDTO> agregarProducto(
+            Authentication authentication,
+            @RequestParam Long productoId,
+            @RequestParam int cantidad
+    ) {
+        validarCliente(authentication);
+        CarritoDTO carritoActualizado = carritoService.agregarProducto(authentication, productoId, cantidad);
+        return ResponseEntity.ok(carritoActualizado);
     }
 
-    @PostMapping
-    public CarritoDTO crear(@RequestBody CarritoDTO dto) {
-        Carrito carrito = new Carrito();
-        carrito.setCliente(dto.getCliente());
-
-        List<CarritoDetalle> detalles = dto.getDetalles()
-                .stream()
-                .map(d -> {
-                    CarritoDetalle detalle = new CarritoDetalle();
-                    detalle.setProducto(d.getProducto());
-                    detalle.setCantidad(d.getCantidad());
-                    detalle.setCarrito(carrito);
-                    return detalle;
-                }).toList();
-
-        carrito.setDetalles(detalles);
-
-        Carrito guardado = carritoService.guardar(carrito);
-        return new CarritoDTO(
-                guardado.getId_carrito(),
-                guardado.getCliente(),
-                guardado.getDetalles().stream()
-                        .map(d -> new CarritoDTO.DetalleDTO(
-                                d.getId_detalle(),
-                                d.getProducto(),
-                                d.getCantidad()
-                        ))
-                        .collect(Collectors.toList())
-        );
+    // Actualizar cantidad de un producto
+    @PutMapping("/actualizar")
+    public ResponseEntity<CarritoDTO> actualizarCantidad(
+            Authentication authentication,
+            @RequestParam Long productoId,
+            @RequestParam int cantidad
+    ) {
+        validarCliente(authentication);
+        CarritoDTO carritoActualizado = carritoService.actualizarCantidad(authentication, productoId, cantidad);
+        return ResponseEntity.ok(carritoActualizado);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        carritoService.eliminar(id);
-        return ResponseEntity.noContent().build();
+    // Disminuir parcialmente cantidad (nuevo)
+    @PutMapping("/disminuir")
+    public ResponseEntity<CarritoDTO> disminuirCantidad(
+            Authentication authentication,
+            @RequestParam Long productoId,
+            @RequestParam int cantidad
+    ) {
+        validarCliente(authentication);
+        CarritoDTO carritoActualizado = carritoService.disminuirCantidad(authentication, productoId, cantidad);
+        return ResponseEntity.ok(carritoActualizado);
+    }
+
+    // Eliminar producto completamente
+    @DeleteMapping("/eliminar")
+    public ResponseEntity<CarritoDTO> eliminarProducto(
+            Authentication authentication,
+            @RequestParam Long productoId
+    ) {
+        validarCliente(authentication);
+        CarritoDTO carritoActualizado = carritoService.eliminarProducto(authentication, productoId);
+        return ResponseEntity.ok(carritoActualizado);
     }
 }
-

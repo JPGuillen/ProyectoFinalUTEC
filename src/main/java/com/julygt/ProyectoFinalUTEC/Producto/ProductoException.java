@@ -25,15 +25,15 @@ public class ProductoException {
             super("Producto con id " + id + " no encontrado");
         }
     }
-        public static class NoEncontradoExceptionNombre extends RuntimeException {
-            public NoEncontradoExceptionNombre(String nombre) {
-                super("No se encontraron productos con el nombre:" + nombre);
-            }
-        }
-
-        public static class DatosInvalidosException extends RuntimeException {
-            public DatosInvalidosException(String message) {
-                super(message);
-            }
+    public static class NoEncontradoExceptionNombre extends RuntimeException {
+        public NoEncontradoExceptionNombre(String nombre) {
+            super("No se encontraron productos con el nombre:" + nombre);
         }
     }
+
+    public static class DatosInvalidosException extends RuntimeException {
+        public DatosInvalidosException(String message) {
+            super(message);
+        }
+    }
+}

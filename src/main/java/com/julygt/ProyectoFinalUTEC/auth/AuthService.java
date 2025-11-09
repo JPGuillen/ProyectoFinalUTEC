@@ -35,14 +35,13 @@ public class AuthService {
         var usuario = new Usuario();
         usuario.setUsername(request.getUsername());
         usuario.setEmail(request.getEmail());
-
-        // Guardar la contraseña tal como viene (sin encriptar aquí)
         usuario.setContrasena(request.getContrasena());
 
-        // Validar y asignar rol
+        // ✅ Validar y asignar rol (se asegura que se use el Enum Role correctamente)
         if (request.getRole() == null) {
             throw new AuthException.InvalidDataException("El rol es obligatorio");
         }
+
         usuario.setRole(request.getRole());
 
         // Ajuste para clientes: nombrePublicoTienda debe ser null

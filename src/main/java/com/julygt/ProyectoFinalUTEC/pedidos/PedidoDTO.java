@@ -1,7 +1,5 @@
 package com.julygt.ProyectoFinalUTEC.pedidos;
 
-import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
-import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -13,19 +11,35 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PedidoDTO {
+private Long id;
+private Double total;
+private String estado;
+private LocalDateTime fechaCreacion;
+private String direccionEnvio;
+private List<PedidoDetalleDTO> detalles;
 
-    private Long id_pedido;
-    private Usuario cliente;
-    private LocalDateTime fecha;
-    private String estado;
-    private List<DetalleDTO> detalles;
+public static PedidoDTO fromEntity(Pedido pedido) {
+    PedidoDTO dto = new PedidoDTO();
+    dto.setId(pedido.getId());
+    dto.setTotal(pedido.getTotal());
+    dto.setEstado(pedido.getEstado());
+    dto.setFechaCreacion(pedido.getFechaCreacion());
+    dto.setDireccionEnvio(pedido.getDireccionEnvio());
+    dto.setDetalles(
+            pedido.getDetalles() != null
+                    ? pedido.getDetalles().stream().map(PedidoDetalleDTO::fromEntity).toList()
+                    : null
+    );
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class DetalleDTO {
-        private Long id_detalle;
-        private ProductoBD producto;
-        private Integer cantidad;
+    // 🔹 Convertimos los detalles a DTO y se calcula subtotal dinámicamente
+   /* dto.setDetalles(
+            pedido.getDetalles() != null
+                    ? pedido.getDetalles().stream()
+                    .map(PedidoDetalleDTO::fromEntity)
+                    .toList()
+                    : null
+    );
+*/
+    return dto;
     }
 }

@@ -1,49 +1,52 @@
 package com.julygt.ProyectoFinalUTEC.resenas;
 
-import org.springframework.http.ResponseEntity;
+import com.julygt.ProyectoFinalUTEC.usuario.Role;
+import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
+import com.julygt.ProyectoFinalUTEC.usuario.UsuarioRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/resenas")
+@RequestMapping("api/resenas")
 public class ResenaController {
 
-    private final ResenaService resenaService;
+    @Autowired
+    private ResenaService resenaService;
 
-    public ResenaController(ResenaService resenaService) {
-        this.resenaService = resenaService;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    // Listar reseñas de un producto (visibilidad todos)
+    @GetMapping("/producto/{id}")
+    public ResponseEntity<List<ResenaDTO>> listarPorProducto(@PathVariable Long id) {
+        List<ResenaDTO> response = resenaService.listarPorProducto(id);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping
-    public List<Resena> listar() { return resenaService.listarTodas(); }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Resena> obtener(@PathVariable Long id) {
-        return resenaService.obtenerPorId(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
+    // Crear una nueva reseña (Clientes logueados)
     @PostMapping
-    public Resena crear(@RequestBody Resena resena) {
-        return resenaService.guardar(resena);
+    public ResponseEntity<String> crearResena(@RequestBody ResenaDTO resenaDTO) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+        Usuario usuario = usuarioRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (usuario.getRole() != Role.CLIENTE) {
+            return ResponseEntity.status(403).body("Solo clientes pueden crear reseñas");
+        }
+
+        resenaService.crearResena(resenaDTO, usuario);
+        return ResponseEntity.ok("Reseña creada correctamente");
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Resena> actualizar(@PathVariable Long id, @RequestBody Resena resena) {
-        return resenaService.obtenerPorId(id)
-                .map(r -> {
-                    r.setCalificacion(resena.getCalificacion());
-                    r.setComentario(resena.getComentario());
-                    return ResponseEntity.ok(resenaService.guardar(r));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    @GetMapping("/producto/{id}/promedio")
+    public ResponseEntity<Double> obtenerPromedio(@PathVariable Long id) {
+        Double promedio = resenaService.obtenerPromedioCalificacion(id);
+        return ResponseEntity.ok(promedio);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        resenaService.eliminar(id);
-        return ResponseEntity.noContent().build();
-    }
 }
-

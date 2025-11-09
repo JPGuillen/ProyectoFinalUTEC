@@ -3,47 +3,43 @@ package com.julygt.ProyectoFinalUTEC.pedidos;
 import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
 import com.julygt.ProyectoFinalUTEC.usuario.Usuario;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "pedido_detalle")
 public class PedidoDetalle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id_detalle;
+    @Column(name = "id_detalle")
+    private Long id;
 
-    @ManyToOne
+// Relacion con Pedido
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_pedido", nullable = false)
     private Pedido pedido;
 
-    @ManyToOne
+// Relacion con Producto
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_producto", nullable = false)
     private ProductoBD producto;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_vendedor", nullable = false)
     private Usuario vendedor;
 
+
+    @Column(nullable = false)
     private Integer cantidad;
-    private Double precio_unitario;
 
-    // Getters y Setters
-    public Long getId_detalle() { return id_detalle; }
-    public void setId_detalle(Long id_detalle) { this.id_detalle = id_detalle; }
+    @Column(nullable = false)
+    private Double precioUnitario;
 
-    public Pedido getPedido() { return pedido; }
-    public void setPedido(Pedido pedido) { this.pedido = pedido; }
-
-    public ProductoBD getProducto() { return producto; }
-    public void setProducto(ProductoBD producto) { this.producto = producto; }
-
-    public Usuario getVendedor() { return vendedor; }
-    public void setVendedor(Usuario vendedor) { this.vendedor = vendedor; }
-
-    public Integer getCantidad() { return cantidad; }
-    public void setCantidad(Integer cantidad) { this.cantidad = cantidad; }
-
-    public Double getPrecio_unitario() { return precio_unitario; }
-    public void setPrecio_unitario(Double precio_unitario) { this.precio_unitario = precio_unitario; }
+   // @Column(nullable = false)
+   // private Double subtotal;
 }
-

@@ -1,38 +1,35 @@
 package com.julygt.ProyectoFinalUTEC.categorias;
 
-
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
-@Service
 
+@Service
 public class CategoriaService {
+
     private final CategoriaRepository categoriaRepository;
 
     public CategoriaService(CategoriaRepository categoriaRepository) {
         this.categoriaRepository = categoriaRepository;
     }
 
+    // Listar todas las categorías (disponible para todos)
     public List<Categoria> listarTodas() {
-        return categoriaRepository.findAll(); //global
+        return categoriaRepository.findAll();
     }
 
-    public Optional<Categoria> obtenerPorId(Long id) {
-        return categoriaRepository.findById(id);
+    // Obtener categoría por ID
+    public Categoria obtenerPorIdOExcepcion(Long id) {
+        return categoriaRepository.findById(id)
+                .orElseThrow(() -> new CategoriaNotFoundException(id));
     }
 
-    public Categoria guardar(Categoria categoria) {
-        return categoriaRepository.save(categoria);
+    // Buscar categorías por nombre parcial (ignora mayúsculas/minúsculas)
+    public List<Categoria> buscarPorNombreParcial(String nombre) {
+        List<Categoria> categorias = categoriaRepository.findByNombreContainingIgnoreCase(nombre);
+        if (categorias.isEmpty()) {
+            throw new CategoriaNotFoundException(nombre);
+        }
+        return categorias;
     }
-
-    public void eliminar(Long id) {
-        categoriaRepository.deleteById(id);
-    }
-
-    public Optional<Categoria> obtenerPorNombre(String nombre) {
-        return categoriaRepository.findFirstByNombreContainingIgnoreCase(nombre);
-    }
-
-
 }
-

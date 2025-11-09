@@ -1,57 +1,34 @@
 package com.julygt.ProyectoFinalUTEC.carrito;
 
 import com.julygt.ProyectoFinalUTEC.Producto.ProductoBD;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
 
+@Data               // getters, setters, toString, equals, hashCode
+@NoArgsConstructor  // constructor vacío
+@AllArgsConstructor // constructor (todos los campos)
 @Entity
 @Table(name = "carrito_detalle")
 public class CarritoDetalle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id_detalle;
+    @Column(name ="id_detalle")
+    private Long id;
 
-    @ManyToOne
+   // Relación con carrito
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_carrito", nullable = false)
     private Carrito carrito;
 
-    @ManyToOne
+    // Relación con producto
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_producto", nullable = false)
     private ProductoBD producto;
 
+    // Cantidad de unidades de ese producto
     @Column(nullable = false)
     private Integer cantidad;
-
-    // Getters y Setters
-    public Long getId_detalle() {
-        return id_detalle;
-    }
-
-    public void setId_detalle(Long id_detalle) {
-        this.id_detalle = id_detalle;
-    }
-
-    public Carrito getCarrito() {
-        return carrito;
-    }
-
-    public void setCarrito(Carrito carrito) {
-        this.carrito = carrito;
-    }
-
-    public ProductoBD getProducto() {
-        return producto;
-    }
-
-    public void setProducto(ProductoBD producto) {
-        this.producto = producto;
-    }
-
-    public Integer getCantidad() {
-        return cantidad;
-    }
-
-    public void setCantidad(Integer cantidad) {
-        this.cantidad = cantidad;
-    }
 }
