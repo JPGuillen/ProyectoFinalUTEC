@@ -29,16 +29,4 @@ public class ProductoServiceBD {
     public void eliminar(Long id) {
         productoRepository.deleteById(id);
     }
-
-    // metodo buscarx nombre
-    public List<ProductoBD> buscarPorNombre(String nombre) {
-        return productoRepository.buscarPorNombre(nombre);}
-
-    public List<ProductoBD> listarPorVendedor(Long idVendedor) {
-        return productoRepository.findByVendedorId(idVendedor);
-    }
-
-    public List<ProductoBD> buscarPorNombreYVendedor(String nombre, Long idVendedor) {
-        return productoRepository.findByNombreContainingIgnoreCaseAndVendedorId(nombre, idVendedor);
-    }
 }
