@@ -18,8 +18,8 @@ public class AuthDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class LoginRequest {
-        @NotBlank(message = "El nombre de usuario es obligatorio")
-        private String username;
+        @NotBlank(message = "Nombre de usuario o email es obligatorio")
+        private String usernameOrEmail;  // Se modifico x el Front
 
         @NotBlank(message = "La contraseña es obligatoria")
         private String contrasena;

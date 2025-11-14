@@ -81,7 +81,7 @@ public class AuthService {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            request.getUsername(),
+                            request.getUsernameOrEmail(),  // Modificado x el front
                             request.getContrasena()
                     )
             );
