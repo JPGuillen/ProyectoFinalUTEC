@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:3000") // Permite que el frontend se conecte
 public class AuthController {
 
     private final AuthService authService;
@@ -22,6 +23,9 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthDTO.AuthResponse> authenticate(@Valid @RequestBody AuthDTO.LoginRequest request) {
+        // Log para depuración: ver si la petición llega
+        System.out.println("Intento de login desde frontend: " + request.getUsernameOrEmail());
+
         AuthDTO.AuthResponse response = authService.authenticate(request);
         return ResponseEntity.ok(response);
     }
